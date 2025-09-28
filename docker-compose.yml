@@ -1,8 +1,4 @@
-cat > docker-compose.yml <<'EOF'
-version: "3.9"
-
 services:
-  # ---------- PostgreSQL ----------
   postgres:
     image: postgres:15-alpine
     container_name: pg-orbit
@@ -20,17 +16,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # ---------- MinIO (S3 compatible) ----------
   minio:
-    image: minio/minio:RELEASE
+    image: minio/minio:latest
     container_name: minio-orbit
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -39,62 +34,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ---------- Placeholder for FastAPI ----------
-  api-py:
-    build:
-      context: .
-      dockerfile: api-py/Dockerfile
-    container_name: api-py
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: orbit
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      S3_ENDPOINT: http://minio:9000
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      S3_BUCKET: orbit-gallery
-    ports:
-      - "8000:8000"
-
-  # ---------- Placeholder for Quarkus ----------
-  api-java:
-    build:
-      context: .
-      dockerfile: api-java/Dockerfile
-    container_name: api-java
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      JDBC_URL: jdbc:postgresql://postgres:5432/orbit?user=postgres&password=postgres
-      S3_ENDPOINT: http://minio:9000
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      S3_BUCKET: orbit-gallery
-    ports:
-      - "8080:8080"
-
-  # ---------- Nuxt UI ----------
-  ui:
-    build:
-      context: .
-      dockerfile: ui/Dockerfile
-    container_name: ui
-    ports:
-      - "3000:80"
-    depends_on:
-      - api-py
-      - api-java
-
 volumes:
-  pg-data:
-  minio-data:
-EOF
+  pg-data: {}
+  minio-data: {}
