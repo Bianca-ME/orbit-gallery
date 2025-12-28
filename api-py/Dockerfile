@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the app folder
 COPY ./api-py/app /app/app
+# in this case the test file should be
+# api-py/app/test_main.py ----- will be in /app/app/test_main.py
 
 # Expose port
 EXPOSE 8000
