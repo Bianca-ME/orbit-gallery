@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from . import models, schemas, database
 
@@ -28,3 +28,10 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
 @app.get("/photos", response_model=list[schemas.PhotoResponse])
 def list_photos(db: Session = Depends(get_db)):
     return db.query(models.Photo).all()
+
+@app.post("/photos/upload-test") # <--- endpoint
+async def upload_test(file: UploadFile = File(...)):
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+    }
