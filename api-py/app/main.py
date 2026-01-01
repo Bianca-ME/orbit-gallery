@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from . import models, schemas, database
@@ -29,9 +30,20 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
 def list_photos(db: Session = Depends(get_db)):
     return db.query(models.Photo).all()
 
-@app.post("/photos/upload-test") # <--- endpoint
+@app.post("/photos/upload-test")
 async def upload_test(file: UploadFile = File(...)):
+    upload_dir = "uploads" # to be clear: the dir is created inside the container
+    os.makedirs(upload_dir, exist_ok=True) # create the dir if it doesn't exist
+
+    file_path = os.path.join(upload_dir, file.filename)
+
+    with open(file_path, "wb") as buffer: # create a real file; write binary data
+        content = await file.read() # read the file content async. (read the file's bytes)
+        buffer.write(content)
+
     return {
         "filename": file.filename,
-        "content_type": file.content_type,
+        "saved_to": file_path,
     }
+
+# run docker `compose exec api-py ls uploads` to see the uploaded files inside the container
