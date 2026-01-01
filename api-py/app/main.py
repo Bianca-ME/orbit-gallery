@@ -1,12 +1,23 @@
-import uuid # universally unique identifiers
-from minio import Minio
+# Standard library imports
 import os
+import uuid # universally unique identifiers
+
+# Third-party imports
 from fastapi import FastAPI, Depends, UploadFile, File
+from minio import Minio
 from sqlalchemy.orm import Session
+
+# Local project imports
 from . import models, schemas, database
+from .database import engine
+from .models import Base
+
+# Create database tables (runs once at import time) / initialise DB schema
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# MinIO client configuration
 minio_client = Minio(
     "minio-orbit:9000",         # minio-orbit = container name (Docker DNS); MiniO API port: 9000
     access_key="minioadmin",
