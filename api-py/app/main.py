@@ -1,3 +1,4 @@
+import uuid # universally unique identifiers
 from minio import Minio
 import os
 from fastapi import FastAPI, Depends, UploadFile, File
@@ -38,28 +39,12 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
 def list_photos(db: Session = Depends(get_db)):
     return db.query(models.Photo).all()
 
-# @app.post("/photos/upload-test")  # Temporarily save uploaded file inside container
-# async def upload_test(file: UploadFile = File(...)):
-#     upload_dir = "uploads" # to be clear: the dir is created inside the container
-#     os.makedirs(upload_dir, exist_ok=True) # create the dir if it doesn't exist
-
-#     file_path = os.path.join(upload_dir, file.filename)
-
-#     with open(file_path, "wb") as buffer: # create a real file; write binary data
-#         content = await file.read() # read the file content async. (read the file's bytes)
-#         buffer.write(content)
-
-#     return {
-#         "filename": file.filename,
-#         "saved_to": file_path,
-#     }
-
-# run docker `compose exec api-py ls uploads` to see the uploaded files inside the container
-
 @app.post("/photos/upload-test")    # Upload file to MinIO
 async def upload_test(file: UploadFile = File(...)):
     print(">>> UPLOADING TO MINIO <<<")
-    object_name = file.filename
+    # object_name = file.filename # use original filename (not recommended, may cause name conflicts)
+    file_ext = file.filename.split(".")[-1]
+    object_name = f"{uuid.uuid4()}.{file_ext}"
 
     minio_client.put_object(
         bucket_name="photos",
@@ -72,7 +57,6 @@ async def upload_test(file: UploadFile = File(...)):
     print(">>> UPLOAD FINISHED <<<")
 
     return {
-        "filename": file.filename,
-        "stored_in": "minio",
-        "object_name": object_name,
+        "original_filename": file.filename,
+        "object_key": object_name,
     }
