@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 # Local project imports
 from . import models, schemas, database
-from .database import engine
-from .models import Base
+from .database import engine, SessionLocal
+from .models import Base, Photo
 
 # Create database tables (runs once at import time) / initialise DB schema
 Base.metadata.create_all(bind=engine)
@@ -51,8 +51,12 @@ def list_photos(db: Session = Depends(get_db)):
     return db.query(models.Photo).all()
 
 @app.post("/photos/upload-test")    # Upload file to MinIO
-async def upload_test(file: UploadFile = File(...)):
+async def upload_test(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     print(">>> UPLOADING TO MINIO <<<")
+
     # object_name = file.filename # use original filename (not recommended, may cause name conflicts)
     file_ext = file.filename.split(".")[-1]
     object_name = f"{uuid.uuid4()}.{file_ext}"
@@ -65,9 +69,24 @@ async def upload_test(file: UploadFile = File(...)):
         part_size=10 * 1024 * 1024,
         content_type=file.content_type,
     )
+
     print(">>> UPLOAD FINISHED <<<")
 
+    # Save metadata to Postgres
+    photo = Photo(
+        title=file.filename,
+        tags=[],
+        object_key=object_name,
+        original_filename=file.filename,
+    )
+
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+
     return {
-        "original_filename": file.filename,
+        "id": photo.id,
+        "title": photo.title,
         "object_key": object_name,
+        "created_at": photo.created_at,
     }
