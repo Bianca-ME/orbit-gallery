@@ -4,15 +4,17 @@ from datetime import datetime
 
 class PhotoCreate(BaseModel):
     title: str
-    tags: Optional[List[str]] = None
-    s3_key: str
+    tags: Optional[List[str]] = []
+    object_key: str
+    original_filename: str
 
-class PhotoResponse(PhotoCreate):
+class PhotoResponse(BaseModel):
     id: int
     title: str
-    tags: Optional[List[str]] = None
-    s3_key: str
+    tags: List[str] = [] # default to empty list
+    original_filename: str
+    image_url: str
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

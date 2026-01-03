@@ -1,6 +1,7 @@
 # Standard library imports
 import os
 import uuid # universally unique identifiers
+from datetime import timedelta
 
 # Third-party imports
 from fastapi import FastAPI, Depends, UploadFile, File
@@ -33,6 +34,13 @@ def get_db():
     finally:
         db.close()
 
+def get_presigned_url(object_key: str) -> str:
+    return minio_client.presigned_get_object(
+        bucket_name="photos",
+        object_name=object_key,
+        expires=timedelta(hours=3),
+    )
+
 @app.on_event("startup")
 def startup():
     # auto-create tables if not exist
@@ -48,7 +56,19 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
 
 @app.get("/photos", response_model=list[schemas.PhotoResponse])
 def list_photos(db: Session = Depends(get_db)):
-    return db.query(models.Photo).all()
+    photos = db.query(models.Photo).all()
+
+    return [
+        {
+            "id": photo.id,
+            "title": photo.title,
+            "tags": photo.tags or [],
+            "original_filename": photo.original_filename,
+            "image_url": get_presigned_url(photo.object_key),
+            "created_at": photo.created_at,
+        }
+        for photo in photos
+    ]
 
 @app.post("/photos/upload-test")    # Upload file to MinIO
 async def upload_test(
