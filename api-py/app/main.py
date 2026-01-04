@@ -19,12 +19,23 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 # MinIO client configuration
-minio_client = Minio(
-    "minio-orbit:9000",         # minio-orbit = container name (Docker DNS); MiniO API port: 9000
+# Internal client: used by FastAPI inside Docker
+minio_internal = Minio(
+    "minio-orbit:9000",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False,
 )
+
+# Public client: ONLY for signed URLs
+minio_public = Minio(
+    "localhost:9000",
+    access_key="minioadmin",
+    secret_key="minioadmin",
+    secure=False,
+    region="us-east-1",  # ← THIS STOPS THE NETWORK CALL
+)
+
 
 # Dependency: DB session
 def get_db():
@@ -35,7 +46,7 @@ def get_db():
         db.close()
 
 def get_presigned_url(object_key: str) -> str:
-    return minio_client.presigned_get_object(
+    return minio_public.presigned_get_object(
         bucket_name="photos",
         object_name=object_key,
         expires=timedelta(hours=3),
@@ -81,7 +92,7 @@ async def upload_test(
     file_ext = file.filename.split(".")[-1]
     object_name = f"{uuid.uuid4()}.{file_ext}"
 
-    minio_client.put_object(
+    minio_internal.put_object(
         bucket_name="photos",
         object_name=object_name,
         data=file.file,
