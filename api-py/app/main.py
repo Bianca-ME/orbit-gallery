@@ -4,7 +4,7 @@ import uuid # universally unique identifiers
 from datetime import timedelta
 
 # Third-party imports
-from fastapi import FastAPI, Depends, UploadFile, File
+from fastapi import FastAPI, Depends, UploadFile, File, Query
 from minio import Minio
 from sqlalchemy.orm import Session
 
@@ -55,7 +55,7 @@ def get_presigned_url(object_key: str) -> str:
 @app.on_event("startup")
 def startup():
     # auto-create tables if not exist
-    models.Base.metadata.create_all(bind=database.engine)
+    models.Base.metadata.created:_all(bind=database.engine)
 
 @app.post("/photos", response_model=schemas.PhotoResponse)
 def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
@@ -66,8 +66,18 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
     return db_photo
 
 @app.get("/photos", response_model=list[schemas.PhotoResponse])
-def list_photos(db: Session = Depends(get_db)):
-    photos = db.query(models.Photo).all()
+def list_photos(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    photos = (
+        db.query(models.Photo)
+        .order_by(models.Photo.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
