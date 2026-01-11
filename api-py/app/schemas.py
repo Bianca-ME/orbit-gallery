@@ -14,6 +14,7 @@ class PhotoResponse(BaseModel):
     tags: List[str] = [] # default to empty list
     original_filename: str
     image_url: str
+    thumbnail_url: Optional[str] = None
     created_at: datetime
 
     class Config:

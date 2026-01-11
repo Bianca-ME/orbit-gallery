@@ -7,3 +7,4 @@ pytest
 httpx
 python-multipart
 minio # <--- Minio Python SDK
+Pillow # <--- Pillow for thumbnails

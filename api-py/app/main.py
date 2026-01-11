@@ -7,6 +7,8 @@ from datetime import timedelta
 from fastapi import FastAPI, Depends, UploadFile, File, Query
 from minio import Minio
 from sqlalchemy.orm import Session
+from PIL import Image
+import io
 
 # Local project imports
 from . import models, schemas, database
@@ -86,38 +88,57 @@ def list_photos(
             "tags": photo.tags or [],
             "original_filename": photo.original_filename,
             "image_url": get_presigned_url(photo.object_key),
+            "thumbnail_url": (
+                get_presigned_url(photo.thumb_key)
+                if photo.thumb_key
+                else None
+            ),
             "created_at": photo.created_at,
         }
         for photo in photos
     ]
 
-@app.post("/photos/upload-test")    # Upload file to MinIO
+@app.post("/photos/upload-test")
 async def upload_test(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    print(">>> UPLOADING TO MINIO <<<")
-
-    # object_name = file.filename # use original filename (not recommended, may cause name conflicts)
+    # Generate keys
     file_ext = file.filename.split(".")[-1]
-    object_name = f"{uuid.uuid4()}.{file_ext}"
+    object_key = f"{uuid.uuid4()}.{file_ext}"
+    thumb_key = f"thumb_{object_key}"
 
+    # Upload ORIGINAL image
     minio_internal.put_object(
         bucket_name="photos",
-        object_name=object_name,
+        object_name=object_key,
         data=file.file,
         length=-1,
         part_size=10 * 1024 * 1024,
         content_type=file.content_type,
     )
 
-    print(">>> UPLOAD FINISHED <<<")
+    # Reset file pointer (CRITICAL)
+    file.file.seek(0)
+
+    # Generate thumbnail (in memory)
+    thumb_data = generate_thumbnail(file)
+
+    # Upload THUMBNAIL
+    minio_internal.put_object(
+        bucket_name="photos",
+        object_name=thumb_key,
+        data=thumb_data,
+        length=thumb_data.getbuffer().nbytes,
+        content_type="image/jpeg",
+    )
 
     # Save metadata to Postgres
     photo = Photo(
         title=file.filename,
         tags=[],
-        object_key=object_name,
+        object_key=object_key,
+        thumb_key=thumb_key,
         original_filename=file.filename,
     )
 
@@ -125,9 +146,22 @@ async def upload_test(
     db.commit()
     db.refresh(photo)
 
+    # Return response
     return {
         "id": photo.id,
         "title": photo.title,
-        "object_key": object_name,
+        "object_key": object_key,
+        "thumb_key": thumb_key,
         "created_at": photo.created_at,
     }
+
+
+def generate_thumbnail(file: UploadFile, max_size=(300, 300)) -> bytes:
+    image = Image.open(file.file)
+    image.thumbnail(max_size)
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG")
+    buffer.seek(0)
+
+    return buffer
