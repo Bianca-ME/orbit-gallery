@@ -73,30 +73,40 @@ def list_photos(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # Get total count of photos
+    total = db.query(models.Photo).count() # equivalent to SELECT COUNT(*) FROM photos;
+
+
+    # Query photos from the database with pagination
     photos = (
-        db.query(models.Photo)
-        .order_by(models.Photo.created_at.desc())
-        .offset(offset)
-        .limit(limit)
+        db.query(models.Photo) # equivalent to SELECT * FROM photos
+        .order_by(models.Photo.created_at.desc()) # equivalent to ORDER BY created_at DESC
+        .offset(offset) # equivalent to OFFSET :offset
+        .limit(limit) # equivalent to LIMIT :limit
         .all()
     )
 
-    return [
-        {
-            "id": photo.id,
-            "title": photo.title,
-            "tags": photo.tags or [],
-            "original_filename": photo.original_filename,
-            "image_url": get_presigned_url(photo.object_key),
-            "thumbnail_url": (
-                get_presigned_url(photo.thumb_key)
-                if photo.thumb_key
-                else None
-            ),
-            "created_at": photo.created_at,
-        }
-        for photo in photos
-    ]
+    return {
+        "items": [
+            {
+                "id": photo.id,
+                "title": photo.title,
+                "tags": photo.tags or [],
+                "original_filename": photo.original_filename,
+                "image_url": get_presigned_url(photo.object_key),
+                "thumbnail_url": ( # see if thumb_key exists, else give no error 
+                    get_presigned_url(photo.thumb_key)
+                    if photo.thumb_key
+                    else None
+                ),
+                "created_at": photo.created_at,
+            }
+            for photo in photos
+        ],
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+    }
 
 @app.post("/photos/upload-test")
 async def upload_test(
@@ -155,7 +165,7 @@ async def upload_test(
         "created_at": photo.created_at,
     }
 
-
+# Thumbnail helper function
 def generate_thumbnail(file: UploadFile, max_size=(300, 300)) -> bytes:
     image = Image.open(file.file)
     image.thumbnail(max_size)
