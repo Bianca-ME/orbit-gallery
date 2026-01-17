@@ -19,3 +19,9 @@ class PhotoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PhotoListResponse(BaseModel):
+    items: List[PhotoResponse]
+    limit: int
+    offset: int
+    total: int

@@ -2,13 +2,14 @@
 import os
 import uuid # universally unique identifiers
 from datetime import timedelta
+import io # I/O operations
 
 # Third-party imports
 from fastapi import FastAPI, Depends, UploadFile, File, Query
 from minio import Minio
 from sqlalchemy.orm import Session
-from PIL import Image
-import io
+from PIL import Image # Python Imaging Library
+from fastapi import HTTPException
 
 # Local project imports
 from . import models, schemas, database
@@ -38,7 +39,6 @@ minio_public = Minio(
     region="us-east-1",  # ← THIS STOPS THE NETWORK CALL
 )
 
-
 # Dependency: DB session
 def get_db():
     db = database.SessionLocal()
@@ -57,56 +57,7 @@ def get_presigned_url(object_key: str) -> str:
 @app.on_event("startup")
 def startup():
     # auto-create tables if not exist
-    models.Base.metadata.created:_all(bind=database.engine)
-
-@app.post("/photos", response_model=schemas.PhotoResponse)
-def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
-    db_photo = models.Photo(**photo.dict())
-    db.add(db_photo)
-    db.commit()
-    db.refresh(db_photo)
-    return db_photo
-
-@app.get("/photos", response_model=list[schemas.PhotoResponse])
-def list_photos(
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-):
-    # Get total count of photos
-    total = db.query(models.Photo).count() # equivalent to SELECT COUNT(*) FROM photos;
-
-
-    # Query photos from the database with pagination
-    photos = (
-        db.query(models.Photo) # equivalent to SELECT * FROM photos
-        .order_by(models.Photo.created_at.desc()) # equivalent to ORDER BY created_at DESC
-        .offset(offset) # equivalent to OFFSET :offset
-        .limit(limit) # equivalent to LIMIT :limit
-        .all()
-    )
-
-    return {
-        "items": [
-            {
-                "id": photo.id,
-                "title": photo.title,
-                "tags": photo.tags or [],
-                "original_filename": photo.original_filename,
-                "image_url": get_presigned_url(photo.object_key),
-                "thumbnail_url": ( # see if thumb_key exists, else give no error 
-                    get_presigned_url(photo.thumb_key)
-                    if photo.thumb_key
-                    else None
-                ),
-                "created_at": photo.created_at,
-            }
-            for photo in photos
-        ],
-        "limit": limit,
-        "offset": offset,
-        "total": total,
-    }
+    models.Base.metadata.create_all(bind=database.engine)
 
 @app.post("/photos/upload-test")
 async def upload_test(
@@ -162,6 +113,76 @@ async def upload_test(
         "title": photo.title,
         "object_key": object_key,
         "thumb_key": thumb_key,
+        "created_at": photo.created_at,
+    }
+
+@app.post("/photos", response_model=schemas.PhotoResponse)
+def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
+    db_photo = models.Photo(**photo.dict())
+    db.add(db_photo)
+    db.commit()
+    db.refresh(db_photo)
+    return db_photo
+
+@app.get("/photos", response_model=schemas.PhotoListResponse)
+def list_photos(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    # Get total count of photos
+    total = db.query(models.Photo).count() # equivalent to SELECT COUNT(*) FROM photos;
+
+
+    # Query photos from the database with pagination
+    photos = (
+        db.query(models.Photo) # equivalent to SELECT * FROM photos
+        .order_by(models.Photo.created_at.desc()) # equivalent to ORDER BY created_at DESC
+        .offset(offset) # equivalent to OFFSET :offset
+        .limit(limit) # equivalent to LIMIT :limit
+        .all()
+    )
+
+    return {
+        "items": [
+            {
+                "id": photo.id,
+                "title": photo.title,
+                "tags": photo.tags or [],
+                "original_filename": photo.original_filename,
+                "image_url": get_presigned_url(photo.object_key),
+                "thumbnail_url": ( # see if thumb_key exists, else give no error 
+                    get_presigned_url(photo.thumb_key)
+                    if photo.thumb_key
+                    else None
+                ),
+                "created_at": photo.created_at,
+            }
+            for photo in photos
+        ],
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+    }
+
+@app.get("/photos/{photo_id}", response_model=schemas.PhotoResponse)
+def get_photo(photo_id: int, db: Session = Depends(get_db)):
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    return {
+        "id": photo.id,
+        "title": photo.title,
+        "tags": photo.tags or [],
+        "original_filename": photo.original_filename,
+        "image_url": get_presigned_url(photo.object_key),
+        "thumbnail_url": (
+            get_presigned_url(photo.thumb_key)
+            if photo.thumb_key
+            else None
+        ),
         "created_at": photo.created_at,
     }
 
