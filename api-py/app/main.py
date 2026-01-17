@@ -128,15 +128,22 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
 def list_photos(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    tag: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    # Get total count of photos
-    total = db.query(models.Photo).count() # equivalent to SELECT COUNT(*) FROM photos;
+    # Base query
+    query = db.query(models.Photo)
 
+    # Optional tag filtering
+    if tag:
+        query = query.filter(models.Photo.tags.contains([tag]))
+
+    # Get total count of photos (after filtering)
+    total = query.count()
 
     # Query photos from the database with pagination
     photos = (
-        db.query(models.Photo) # equivalent to SELECT * FROM photos
+        query
         .order_by(models.Photo.created_at.desc()) # equivalent to ORDER BY created_at DESC
         .offset(offset) # equivalent to OFFSET :offset
         .limit(limit) # equivalent to LIMIT :limit
