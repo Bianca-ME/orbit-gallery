@@ -25,3 +25,7 @@ class PhotoListResponse(BaseModel):
     limit: int
     offset: int
     total: int
+
+class PhotoUpdate(BaseModel):
+    title: Optional[str] = None
+    tags: Optional[List[str]] = None

@@ -220,6 +220,40 @@ def delete_photo(photo_id: int, db: Session = Depends(get_db)):
     # 5. 204 No Content (correct REST behavior)
     return
 
+@app.patch("/photos/{photo_id}", response_model=schemas.PhotoResponse)
+def update_photo(
+    photo_id: int,
+    updates: schemas.PhotoUpdate,
+    db: Session = Depends(get_db),
+):
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    if updates.title is not None:
+        photo.title = updates.title
+
+    if updates.tags is not None:
+        photo.tags = updates.tags
+
+    db.commit()
+    db.refresh(photo)
+
+    return {
+        "id": photo.id,
+        "title": photo.title,
+        "tags": photo.tags or [],
+        "original_filename": photo.original_filename,
+        "image_url": get_presigned_url(photo.object_key),
+        "thumbnail_url": (
+            get_presigned_url(photo.thumb_key)
+            if photo.thumb_key
+            else None
+        ),
+        "created_at": photo.created_at,
+    }
+
 # Thumbnail helper function
 def generate_thumbnail(file: UploadFile, max_size=(300, 300)) -> bytes:
     image = Image.open(file.file)
