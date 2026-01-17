@@ -186,6 +186,40 @@ def get_photo(photo_id: int, db: Session = Depends(get_db)):
         "created_at": photo.created_at,
     }
 
+@app.delete("/photos/{photo_id}", status_code=204)
+def delete_photo(photo_id: int, db: Session = Depends(get_db)):
+    # 1. Find photo
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    # 2. Delete original image from MinIO
+    try:
+        minio_internal.remove_object("photos", photo.object_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete image from storage: {str(e)}",
+        )
+
+    # 3. Delete thumbnail if exists
+    if photo.thumb_key:
+        try:
+            minio_internal.remove_object("photos", photo.thumb_key)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete thumbnail from storage: {str(e)}",
+            )
+
+    # 4. Delete DB row
+    db.delete(photo)
+    db.commit()
+
+    # 5. 204 No Content (correct REST behavior)
+    return
+
 # Thumbnail helper function
 def generate_thumbnail(file: UploadFile, max_size=(300, 300)) -> bytes:
     image = Image.open(file.file)
