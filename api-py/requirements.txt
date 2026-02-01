@@ -10,3 +10,4 @@ minio # <--- Minio Python SDK
 Pillow # <--- Pillow for thumbnails
 passlib[bcrypt] # <--- For password hashing 
 bcrypt==4.0.1
+pydantic[email]

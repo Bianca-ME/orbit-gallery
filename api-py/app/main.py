@@ -40,16 +40,6 @@ minio_public = Minio(
     region="us-east-1",  # ← THIS STOPS THE NETWORK CALL
 )
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")   
-
-# Password hashing helper functions
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
 # Dependency: DB session
 def get_db():
     db = database.SessionLocal()
@@ -70,6 +60,61 @@ def startup():
     # auto-create tables if not exist
     models.Base.metadata.create_all(bind=database.engine)
 
+# Registration endpoint
+@app.post("/auth/register", response_model=schemas.UserResponse)
+def register_user(
+    user: schemas.UserCreate,
+    db: Session = Depends(get_db),
+):
+    # Check if email already exists
+    existing_user = (
+        db.query(models.User)
+        .filter(models.User.email == user.email)
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered",
+        )
+
+    # Hash password
+    hashed_password = hash_password(user.password)
+
+    # Create user
+    new_user = models.User(
+        email=user.email,
+        hashed_password=hashed_password,
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
+# Login endpoint
+@app.post("/auth/login")
+def login_user(
+    data: schemas.LoginRequest,
+    db: Session = Depends(get_db),
+):
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not pwd_context.verify(data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return {
+        "message": "Login successful",
+        "user_id": user.id,
+        "email": user.email,
+    }
+
+# Test upload endpoint (for manual testing only)
 @app.post("/photos/upload-test")
 async def upload_test(
     file: UploadFile = File(...),
@@ -127,6 +172,7 @@ async def upload_test(
         "created_at": photo.created_at,
     }
 
+# Create photo metadata
 @app.post("/photos", response_model=schemas.PhotoResponse)
 def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
     db_photo = models.Photo(**photo.dict())
@@ -135,6 +181,7 @@ def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
     db.refresh(db_photo)
     return db_photo
 
+# List photos with pagination and optional tag filtering
 @app.get("/photos", response_model=schemas.PhotoListResponse)
 def list_photos(
     limit: int = Query(20, ge=1, le=100),
@@ -183,6 +230,7 @@ def list_photos(
         "total": total,
     }
 
+# Get photo by ID
 @app.get("/photos/{photo_id}", response_model=schemas.PhotoResponse)
 def get_photo(photo_id: int, db: Session = Depends(get_db)):
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
@@ -238,6 +286,7 @@ def delete_photo(photo_id: int, db: Session = Depends(get_db)):
     # 5. 204 No Content (correct REST behavior)
     return
 
+# Update photo metadata
 @app.patch("/photos/{photo_id}", response_model=schemas.PhotoResponse)
 def update_photo(
     photo_id: int,
@@ -283,35 +332,16 @@ def generate_thumbnail(file: UploadFile, max_size=(300, 300)) -> bytes:
 
     return buffer
 
-@app.post("/auth/register", response_model=schemas.UserResponse)
-def register_user(
-    user: schemas.UserCreate,
-    db: Session = Depends(get_db),
-):
-    # Check if email already exists
-    existing_user = (
-        db.query(models.User)
-        .filter(models.User.email == user.email)
-        .first()
-    )
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")   
 
-    if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered",
-        )
+# Password hashing helper functions
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
 
-    # Hash password
-    hashed_password = hash_password(user.password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
-    # Create user
-    new_user = models.User(
-        email=user.email,
-        hashed_password=hashed_password,
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return new_user
+# Password verification helper functions
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
