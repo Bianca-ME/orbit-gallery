@@ -9,5 +9,6 @@ python-multipart
 minio # <--- Minio Python SDK
 Pillow # <--- Pillow for thumbnails
 passlib[bcrypt] # <--- For password hashing 
-bcrypt==4.0.1
-pydantic[email]
+bcrypt==4.0.1 # <--- Specific version to avoid compatibility issues
+pydantic[email] # <--- For email validation
+python-jose[cryptography] # <--- For JWT token handling

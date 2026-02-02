@@ -16,6 +16,7 @@ from passlib.context import CryptContext
 from . import models, schemas, database
 from .database import engine, SessionLocal
 from .models import Base, Photo
+from .security import create_access_token
 
 # Create database tables (runs once at import time) / initialise DB schema
 Base.metadata.create_all(bind=engine)
@@ -107,11 +108,14 @@ def login_user(
 
     if not pwd_context.verify(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    access_token = create_access_token(
+        data={"sub": user.email}
+    )
 
     return {
-        "message": "Login successful",
-        "user_id": user.id,
-        "email": user.email,
+        "access_token": access_token,
+        "token_type": "bearer",
     }
 
 # Test upload endpoint (for manual testing only)
