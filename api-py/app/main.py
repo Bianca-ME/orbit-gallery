@@ -117,6 +117,7 @@ def login_user(
 async def upload_test(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     # Generate keys
     file_ext = file.filename.split(".")[-1]
@@ -252,7 +253,7 @@ def get_photo(photo_id: int, db: Session = Depends(get_db)):
     }
 
 @app.delete("/photos/{photo_id}", status_code=204)
-def delete_photo(photo_id: int, db: Session = Depends(get_db)):
+def delete_photo(photo_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # 1. Find photo
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
@@ -291,6 +292,7 @@ def update_photo(
     photo_id: int,
     updates: schemas.PhotoUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
