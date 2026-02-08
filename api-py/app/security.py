@@ -11,7 +11,7 @@ from .database import get_db
 from . import models
 
 # Global objects / configuration -- a reusable dependency object
-# Token extractor
+# OAuth2 token extractor
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # Helper functions -- don't depend on Depends()
@@ -25,27 +25,26 @@ def create_access_token(data: dict) -> str:
     expire = datetime.utcnow() + ACCESS_TOKEN_EXPIRE_DELTA
     to_encode.update({"exp": expire})
 
-    encoded_jwt = jwt.encode(
+    return jwt.encode(
         to_encode,
         SECRET_KEY,
         algorithm=ALGORITHM
     )
-    return encoded_jwt
 
 # Decode and verify JWT token
 def decode_access_token(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-        return payload
     except JWTError:
         return None
 
 # FastAPI Dependencies -- Depends() lives here
 # Dependency to get current user from token
+# The gatekeeper for protected endpoints -- use this in Depends() to require auth
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),

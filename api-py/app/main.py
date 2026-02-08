@@ -10,13 +10,14 @@ from minio import Minio
 from sqlalchemy.orm import Session
 from PIL import Image # Python Imaging Library
 from fastapi import HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 
 # Local project imports
 from . import models, schemas, database
 from .database import engine, get_db
 from .models import Base, Photo
-from .security import create_access_token
+from .security import create_access_token, get_current_user
 
 # Create database tables (runs once at import time) / initialise DB schema
 Base.metadata.create_all(bind=engine)
@@ -90,15 +91,16 @@ def register_user(
 # Login endpoint
 @app.post("/auth/login")
 def login_user(
-    data: schemas.LoginRequest,
+    # data: schemas.LoginRequest,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    user = db.query(models.User).filter(models.User.email == data.email).first()
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not pwd_context.verify(data.password, user.hashed_password):
+    if not pwd_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     access_token = create_access_token(
@@ -184,6 +186,7 @@ def list_photos(
     offset: int = Query(0, ge=0),
     tag: str | None = Query(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     # Base query
     query = db.query(models.Photo)
