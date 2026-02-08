@@ -14,7 +14,7 @@ from passlib.context import CryptContext
 
 # Local project imports
 from . import models, schemas, database
-from .database import engine, SessionLocal
+from .database import engine, get_db
 from .models import Base, Photo
 from .security import create_access_token
 
@@ -40,14 +40,6 @@ minio_public = Minio(
     secure=False,
     region="us-east-1",  # ← THIS STOPS THE NETWORK CALL
 )
-
-# Dependency: DB session
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def get_presigned_url(object_key: str) -> str:
     return minio_public.presigned_get_object(
