@@ -156,6 +156,7 @@ async def upload_test(
         object_key=object_key,
         thumb_key=thumb_key,
         original_filename=file.filename,
+        user_id=current_user.id,
     )
 
     db.add(photo)
@@ -173,8 +174,15 @@ async def upload_test(
 
 # Create photo metadata
 @app.post("/photos", response_model=schemas.PhotoResponse)
-def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
-    db_photo = models.Photo(**photo.dict())
+def create_photo(
+    photo: schemas.PhotoCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    db_photo = models.Photo(
+        **photo.dict(),
+        user_id=current_user.id
+    )
     db.add(db_photo)
     db.commit()
     db.refresh(db_photo)
@@ -190,7 +198,9 @@ def list_photos(
     current_user: models.User = Depends(get_current_user),
 ):
     # Base query
-    query = db.query(models.Photo)
+    query = db.query(models.Photo).filter(
+        models.Photo.user_id == current_user.id
+    )
 
     # Optional tag filtering
     if tag:
@@ -232,7 +242,11 @@ def list_photos(
 
 # Get photo by ID
 @app.get("/photos/{photo_id}", response_model=schemas.PhotoResponse)
-def get_photo(photo_id: int, db: Session = Depends(get_db)):
+def get_photo(
+    photo_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
     if not photo:
@@ -253,12 +267,22 @@ def get_photo(photo_id: int, db: Session = Depends(get_db)):
     }
 
 @app.delete("/photos/{photo_id}", status_code=204)
-def delete_photo(photo_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_photo(
+    photo_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
     # 1. Find photo
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
+    
+    if photo.user_id != current_user.id:
+        raise HTTPException(
+        status_code=403,
+        detail="You do not own this photo"
+        )
 
     # 2. Delete original image from MinIO
     try:

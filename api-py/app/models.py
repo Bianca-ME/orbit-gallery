@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, func, ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import datetime
 
@@ -23,6 +24,17 @@ class Photo(Base):
         server_default=func.now(),
         nullable=False,)
     
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id"), 
+        nullable=False
+    )
+
+    owner = relationship(
+        "User",
+        back_populates="photos"
+    )
+    
 class User(Base):
     __tablename__ = "users"
 
@@ -34,3 +46,9 @@ class User(Base):
         server_default=func.now(),
         nullable=False,
     ) 
+
+    photos = relationship(
+        "Photo", 
+        back_populates="owner",
+        cascade="all, delete"
+    )
