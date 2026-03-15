@@ -12,6 +12,7 @@ from PIL import Image # Python Imaging Library
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
+from fastapi.middleware.cors import CORSMiddleware
 
 # Local project imports
 from . import models, schemas, database
@@ -23,6 +24,15 @@ from .security import create_access_token, get_current_user
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# CORS configuration (allow React frontend to call API)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # MinIO client configuration
 # Internal client: used by FastAPI inside Docker
@@ -195,12 +205,15 @@ def list_photos(
     offset: int = Query(0, ge=0),
     tag: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    # temporarily commenting out to disable auth for testing
+    # current_user: models.User = Depends(get_current_user),
 ):
     # Base query
-    query = db.query(models.Photo).filter(
-        models.Photo.user_id == current_user.id
-    )
+    # temporarily commenting out to disable auth for testing - we want to see all photos without logging in
+    # query = db.query(models.Photo).filter(
+    #     models.Photo.user_id == current_user.id
+    # )
+    query = db.query(models.Photo)
 
     # Optional tag filtering
     if tag:
@@ -245,7 +258,8 @@ def list_photos(
 def get_photo(
     photo_id: int, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    # temporarily commenting out to disable auth for testing
+    # current_user: models.User = Depends(get_current_user)
 ):
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
