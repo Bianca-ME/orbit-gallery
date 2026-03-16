@@ -127,7 +127,8 @@ def login_user(
 async def upload_test(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    # temporarily commenting out to disable auth for testing
+    # current_user: models.User = Depends(get_current_user),
 ):
     # Generate keys
     file_ext = file.filename.split(".")[-1]
@@ -166,7 +167,9 @@ async def upload_test(
         object_key=object_key,
         thumb_key=thumb_key,
         original_filename=file.filename,
-        user_id=current_user.id,
+        # temporarily commenting out to disable auth for testing
+        # user_id=current_user.id,
+        user_id=1, # hardcoding user_id for testing without auth
     )
 
     db.add(photo)
