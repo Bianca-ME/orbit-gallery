@@ -5,6 +5,7 @@ import { useRouter } from "vue-router"
 const router = useRouter()
 const photos = ref([])
 const loading = ref(true)
+const currentUserEmail = ref(null)  
 
 const isLoggedIn = computed(() => {
   if (process.client) return !!localStorage.getItem("token")
@@ -13,7 +14,26 @@ const isLoggedIn = computed(() => {
 
 function logout() {
   localStorage.removeItem("token")
+  currentUserEmail.value = null
   router.push("/login")
+}
+
+async function deletePhoto(photoId) {
+  const token = localStorage.getItem("token")
+  if (!token) return
+
+  const confirmed = confirm("Delete this photo?")
+  if (!confirmed) return
+
+  await fetch(`http://localhost:8000/photos/${photoId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  // Remove from local list without reloading the page
+  photos.value = photos.value.filter((p) => p.id !== photoId)
 }
 
 onMounted(async () => {
@@ -21,6 +41,13 @@ onMounted(async () => {
   const data = await res.json()
   photos.value = data.items
   loading.value = false
+
+  // Decode the token to get current user email
+  const token = localStorage.getItem("token")
+  if (token) {
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    currentUserEmail.value = payload.sub
+  }
 })
 </script>
 
@@ -46,10 +73,16 @@ onMounted(async () => {
       <div v-for="photo in photos" :key="photo.id">
         <img :src="photo.thumbnail_url" :alt="photo.title" />
         <p>{{ photo.title }}</p>
-        <p>{{ photo.owner_email }}</p>
+        <p>Posted by {{ photo.owner_email }}</p>
         <div>
-          <span v-for="tag in photo.tags" :key="tag">{{ tag }} </span>
+          <span v-for="tag in photo.tags" :key="tag">Tags: {{ tag }} </span>
         </div>
+        <button
+          v-if="currentUserEmail === photo.owner_email"
+          @click="deletePhoto(photo.id)"
+        >
+          Delete
+        </button>
       </div>
     </div>
   </div>
