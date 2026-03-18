@@ -46,6 +46,7 @@ onMounted(async () => {
       <div v-for="photo in photos" :key="photo.id">
         <img :src="photo.thumbnail_url" :alt="photo.title" />
         <p>{{ photo.title }}</p>
+        <p>{{ photo.owner_email }}</p>
         <div>
           <span v-for="tag in photo.tags" :key="tag">{{ tag }} </span>
         </div>

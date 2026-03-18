@@ -16,6 +16,7 @@ class PhotoResponse(BaseModel):
     image_url: str
     thumbnail_url: Optional[str] = None
     created_at: datetime
+    owner_email: Optional[str] = None
 
     class Config:
         from_attributes = True

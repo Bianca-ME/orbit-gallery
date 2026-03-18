@@ -245,6 +245,7 @@ def list_photos(
                     else None
                 ),
                 "created_at": photo.created_at,
+                "owner_email": photo.owner.email,
             }
             for photo in photos
         ],
