@@ -215,7 +215,7 @@ def list_photos(
     # )
     query = db.query(models.Photo)
 
-    # Optional tag filtering
+    # Tag filtering
     if tag:
         query = query.filter(models.Photo.tags.contains([tag]))
 

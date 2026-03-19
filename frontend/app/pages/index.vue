@@ -6,6 +6,7 @@ const router = useRouter()
 const photos = ref([])
 const loading = ref(true)
 const currentUserEmail = ref(null)  
+const activeTag = ref(null)
 
 const isLoggedIn = computed(() => {
   if (process.client) return !!localStorage.getItem("token")
@@ -16,6 +17,28 @@ function logout() {
   localStorage.removeItem("token")
   currentUserEmail.value = null
   router.push("/login")
+}
+
+async function fetchPhotos(tag = null) {
+  loading.value = true
+  const url = tag
+    ? `http://localhost:8000/photos?tag=${tag}`
+    : `http://localhost:8000/photos`
+  const res = await fetch(url)
+  const data = await res.json()
+  photos.value = data.items
+  loading.value = false
+}
+
+function filterByTag(tag) {
+  if (activeTag.value === tag) {
+    // clicking the same tag again clears the filter
+    activeTag.value = null
+    fetchPhotos()
+  } else {
+    activeTag.value = tag
+    fetchPhotos(tag)
+  }
 }
 
 async function deletePhoto(photoId) {
@@ -62,10 +85,16 @@ onMounted(async () => {
       </div>
     </header>
 
+    <div v-if="activeTag">
+      Filtering by: {{ activeTag}}
+      <button @click="filterByTag(activeTag)">Clear</button>
+    </div>
+
     <div v-if="loading">Loading images...</div>
 
     <div v-else-if="photos.length === 0">
       <p>No images yet.</p>
+      <button v-if="activeTag" @click="filterByTag(activeTag)">Clear filter</button>
       <NuxtLink to="/upload">Upload your first satellite image</NuxtLink>
     </div>
 
@@ -75,7 +104,14 @@ onMounted(async () => {
         <p>{{ photo.title }}</p>
         <p>Posted by {{ photo.owner_email }}</p>
         <div>
-          <span v-for="tag in photo.tags" :key="tag">Tags: {{ tag }} </span>
+          <span 
+            v-for="tag in photo.tags" 
+            :key="tag"
+            @click="filterByTag(tag)"
+            style="cursor: pointer; margin-right: 4px;"
+          >
+            Tags: {{ tag }} 
+          </span>
         </div>
         <button
           v-if="currentUserEmail === photo.owner_email"
